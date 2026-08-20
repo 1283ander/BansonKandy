@@ -1,0 +1,6 @@
+{
+  "name": "Live Voice Translator",
+  "description": "Real-time speech-to-speech conversational translator using Gemini Live API.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
