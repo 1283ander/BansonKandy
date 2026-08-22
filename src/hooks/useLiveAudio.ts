@@ -9,10 +9,15 @@ import {
 
 interface UseLiveAudioOptions {
   targetLanguage: string;
-  voice: string;
+  voiceName: string;
+  customStyle: string;
 }
 
-export function useLiveAudio({ targetLanguage, voice }: UseLiveAudioOptions) {
+export function useLiveAudio({
+  targetLanguage,
+  voiceName,
+  customStyle,
+}: UseLiveAudioOptions) {
   const [connectionState, setConnectionState] = useState<ConnectionState>("disconnected");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [userVolume, setUserVolume] = useState<number>(0);
@@ -28,14 +33,21 @@ export function useLiveAudio({ targetLanguage, voice }: UseLiveAudioOptions) {
   const playerRef = useRef<LiveAudioPlayer | null>(null);
   const animFrameIdRef = useRef<number | null>(null);
 
+  // References to track latest configurations
   const targetLanguageRef = useRef(targetLanguage);
   targetLanguageRef.current = targetLanguage;
 
-  const voiceRef = useRef(voice);
-  voiceRef.current = voice;
+  const voiceNameRef = useRef(voiceName);
+  voiceNameRef.current = voiceName;
 
-  // Cleanup all audio contexts and sockets
-  const cleanupAudio = useCallback(() => {
+  const customStyleRef = useRef(customStyle);
+  customStyleRef.current = customStyle;
+
+  // Track previous configurations to detect changes during active sessions
+  const prevConfigRef = useRef({ targetLanguage, voiceName, customStyle });
+
+  // Cleanup all audio resources and sockets
+  const cleanupAudio = useCallback((keepPlayer: boolean = false) => {
     if (animFrameIdRef.current) {
       cancelAnimationFrame(animFrameIdRef.current);
       animFrameIdRef.current = null;
@@ -62,7 +74,7 @@ export function useLiveAudio({ targetLanguage, voice }: UseLiveAudioOptions) {
       });
       mediaStreamRef.current = null;
     }
-    if (playerRef.current) {
+    if (!keepPlayer && playerRef.current) {
       playerRef.current.stop();
       playerRef.current = null;
     }
@@ -130,7 +142,7 @@ export function useLiveAudio({ targetLanguage, voice }: UseLiveAudioOptions) {
       analyser.fftSize = 256;
       inputAnalyserRef.current = analyser;
 
-      // Buffer size 2048 gives low-latency continuous stream
+      // Buffer size 2048 gives responsive continuous stream
       const processor = inputCtx.createScriptProcessor(2048, 1, 1);
       processorRef.current = processor;
 
@@ -152,12 +164,13 @@ export function useLiveAudio({ targetLanguage, voice }: UseLiveAudioOptions) {
       wsRef.current = ws;
 
       ws.onopen = () => {
-        // Send start configuration
+        // Send initial setup handshake with voice and custom style configuration
         ws.send(
           JSON.stringify({
             type: "start",
             targetLanguage: targetLanguageRef.current,
-            voice: voiceRef.current,
+            voiceName: voiceNameRef.current,
+            customStyle: customStyleRef.current,
           })
         );
       };
@@ -210,7 +223,11 @@ export function useLiveAudio({ targetLanguage, voice }: UseLiveAudioOptions) {
       };
 
       ws.onclose = () => {
-        setConnectionState((prev) => (prev === "connecting" || prev === "connected" || prev === "translating" ? "disconnected" : prev));
+        setConnectionState((prev) =>
+          prev === "connecting" || prev === "connected" || prev === "translating"
+            ? "disconnected"
+            : prev
+        );
         cleanupAudio();
       };
 
@@ -255,31 +272,38 @@ export function useLiveAudio({ targetLanguage, voice }: UseLiveAudioOptions) {
     setCurrentModelTurnText("");
   }, [cleanupAudio]);
 
-  const updateTargetLanguage = useCallback((newTarget: string) => {
-    targetLanguageRef.current = newTarget;
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(
-        JSON.stringify({
-          type: "update_target",
-          targetLanguage: newTarget,
-          voice: voiceRef.current,
-        })
-      );
-    }
-  }, []);
+  // Requirement 4: Whenever the user updates voiceName, customStyle, or targetLanguage,
+  // cleanly tear down the active WebSocket session and re-establish a new handshake using the updated configuration
+  useEffect(() => {
+    const prev = prevConfigRef.current;
+    const hasChanged =
+      prev.targetLanguage !== targetLanguage ||
+      prev.voiceName !== voiceName ||
+      prev.customStyle !== customStyle;
 
-  const updateVoice = useCallback((newVoice: string) => {
-    voiceRef.current = newVoice;
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(
-        JSON.stringify({
-          type: "update_target",
-          targetLanguage: targetLanguageRef.current,
-          voice: newVoice,
-        })
-      );
+    if (hasChanged) {
+      prevConfigRef.current = { targetLanguage, voiceName, customStyle };
+
+      const isActive =
+        connectionState === "connected" ||
+        connectionState === "translating" ||
+        connectionState === "speaking" ||
+        connectionState === "connecting";
+
+      if (isActive) {
+        // Clean teardown and immediate re-handshake
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          try {
+            wsRef.current.send(JSON.stringify({ type: "stop" }));
+          } catch {
+            // ignore
+          }
+        }
+        cleanupAudio(true);
+        startSession();
+      }
     }
-  }, []);
+  }, [targetLanguage, voiceName, customStyle, connectionState, cleanupAudio, startSession]);
 
   useEffect(() => {
     return () => {
@@ -296,8 +320,18 @@ export function useLiveAudio({ targetLanguage, voice }: UseLiveAudioOptions) {
     currentModelTurnText,
     startSession,
     stopSession,
-    updateTargetLanguage,
-    updateVoice,
     clearHistory: () => setTranslations([]),
+    addManualTurn: (text: string) => {
+      if (!text.trim()) return;
+      setTranslations((hist) => [
+        ...hist,
+        {
+          id: Math.random().toString(36).substring(2, 9),
+          timestamp: new Date(),
+          speaker: "model",
+          text: text.trim(),
+        },
+      ]);
+    },
   };
 }
