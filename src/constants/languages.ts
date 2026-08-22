@@ -1,21 +1,19 @@
 import { LanguageOption, VoiceOption } from "../types";
 
 export const PRIMARY_LANGUAGES: LanguageOption[] = [
-  { code: "en", name: "English", nativeName: "English (US/Global)", flag: "🇺🇸" },
-  { code: "km", name: "Khmer", nativeName: "ភាសាខ្មែរ", flag: "🇰🇭" },
+  { code: "es-419", name: "Latin American Spanish", nativeName: "Español (Latinoamérica)", flag: "🇲🇽" },
   { code: "vi", name: "Vietnamese", nativeName: "Tiếng Việt", flag: "🇻🇳" },
   { code: "th", name: "Thai", nativeName: "ภาษาไทย", flag: "🇹🇭" },
-  { code: "es-419", name: "Latin American Spanish", nativeName: "Español (Latinoamérica)", flag: "🇲🇽" },
+  { code: "km", name: "Khmer", nativeName: "ភាសាខ្មែរ", flag: "🇰🇭" },
   { code: "zh-CN", name: "Mainland Chinese", nativeName: "中文 (简体普通话)", flag: "🇨🇳" },
 ];
 
 export const TARGET_LANGUAGES: LanguageOption[] = [
-  // Primary Priority Languages
-  { code: "en", name: "English", nativeName: "English (US/Global)", flag: "🇺🇸" },
-  { code: "km", name: "Khmer", nativeName: "ភាសាខ្មែរ", flag: "🇰🇭" },
+  // 5 Main Priority Languages
+  { code: "es-419", name: "Latin American Spanish", nativeName: "Español (Latinoamérica)", flag: "🇲🇽" },
   { code: "vi", name: "Vietnamese", nativeName: "Tiếng Việt", flag: "🇻🇳" },
   { code: "th", name: "Thai", nativeName: "ภาษาไทย", flag: "🇹🇭" },
-  { code: "es-419", name: "Latin American Spanish", nativeName: "Español (Latinoamérica)", flag: "🇲🇽" },
+  { code: "km", name: "Khmer", nativeName: "ភាសាខ្មែរ", flag: "🇰🇭" },
   { code: "zh-CN", name: "Mainland Chinese", nativeName: "中文 (简体普通话)", flag: "🇨🇳" },
 
   // Additional Global Languages

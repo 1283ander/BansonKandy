@@ -29,27 +29,24 @@ function getAI(): GoogleGenAI {
   return aiClient;
 }
 
-function buildSystemInstruction(
-  mode: "single" | "dual",
-  langA: string,
-  langB: string
-): string {
-  if (mode === "single") {
-    return `You are a strict linguistic mirror. Listen to the user and translate their speech into the target language. You must perfectly preserve the user's exact register, grammatical correctness, socio-economic dialect, and level of vulgarity. If the user uses creative profanity, mispronunciations, or uneducated vulgate syntax, you must find the exact connotative and semiotic analogue in the target language that conveys the same meaning, tone, and social marker. Do not sanitize, correct, or polite-ify the input.
+function buildSystemInstruction(targetLanguage: string): string {
+  return `You are an ultra-low-latency, real-time speech-to-speech conversational translator.
+Your sole purpose is to translate speech back and forth instantaneously with natural rhythm, authentic accents, and realistic prosody.
 
-Target Language: ${langB || "Khmer"}.
-Output ONLY the spoken translated speech.`;
-  } else {
-    return `You are a bilingual mediator for two users speaking different languages. Listen to the input, detect which of the two languages was spoken, and automatically translate it into the other language. You are a strict linguistic mirror. You must perfectly preserve the speaker's exact register, grammatical correctness, socio-economic dialect, and level of vulgarity. If a speaker uses creative profanity, mispronunciations, or uneducated vulgate syntax, you must find the exact connotative and semiotic analogue in the target language that conveys the same meaning, tone, and social marker. Do not sanitize, correct, or polite-ify the input.
+Configured target language for English speech: ${targetLanguage || "Khmer"}
 
-The two languages in this conversation are:
-- Language 1: ${langA || "English"}
-- Language 2: ${langB || "Khmer"}
-
-When Language 1 is spoken, immediately translate it into Language 2.
-When Language 2 is spoken, immediately translate it into Language 1.
-Maintain fluid turn-taking and output ONLY the spoken translated speech.`;
-  }
+STRICT OPERATIONAL RULES:
+1. BIDIRECTIONAL LANGUAGE ROUTING:
+   - If the user speaks in English: Instantly translate their words into ${targetLanguage || "Khmer"}.
+   - If the user speaks in ANY foreign language other than English (including Khmer, Vietnamese, Thai, Latin American Spanish, Mandarin Chinese, French, German, Japanese, Korean, Russian, etc.): Instantly translate their words into English.
+2. FIDELITY & ACCURACY:
+   - Mirror the exact emotional tone, volume, cadence, hesitation, laughter, and nuance of the original speaker.
+   - Do NOT censor, soften, sanitize, or embellish. Maintain natural sounding colloquial phrasing and prosody.
+3. TRANSLATION ONLY:
+   - You MUST NEVER engage in dialogue with the user.
+   - You MUST NEVER answer questions asked by the user or offer commentary.
+   - You MUST NEVER prefix responses with phrases like "The translation is:", "In English:", etc.
+   - Output ONLY the translated speech in voice.`;
 }
 
 async function startServer() {
@@ -66,36 +63,22 @@ async function startServer() {
   // REST Translation Fallback Endpoint
   app.post("/api/translate", async (req, res) => {
     try {
-      const { text, targetLanguage = "Khmer", mode = "single", sourceLanguage = "English" } = req.body;
+      const { text, targetLanguage = "Khmer" } = req.body;
       if (!text) {
         return res.status(400).json({ error: "Missing text to translate" });
       }
 
       const ai = getAI();
-      const prompt = mode === "dual"
-        ? `You are a bilingual mediator for two users speaking ${sourceLanguage} and ${targetLanguage}.
-You are a strict linguistic mirror. You must perfectly preserve the speaker's exact register, grammatical correctness, socio-economic dialect, and level of vulgarity. If a speaker uses creative profanity, mispronunciations, or uneducated vulgate syntax, you must find the exact connotative and semiotic analogue in the target language that conveys the same meaning, tone, and social marker. Do not sanitize, correct, or polite-ify the input.
+      const prompt = `You are an expert bidirectional translator. 
+If the following text is in English, translate it to ${targetLanguage}.
+If the text is in any language other than English, translate it to English.
+Return ONLY the translation without any quotes or explanations.
 
-Translate this text into the other language:
-"${text}"
-Return ONLY the raw translation.`
-        : `You are a strict linguistic mirror. Listen to the user and translate their speech into ${targetLanguage}. You must perfectly preserve the user's exact register, grammatical correctness, socio-economic dialect, and level of vulgarity. If the user uses creative profanity, mispronunciations, or uneducated vulgate syntax, you must find the exact connotative and semiotic analogue in the target language that conveys the same meaning, tone, and social marker. Do not sanitize, correct, or polite-ify the input.
-
-Text to translate:
-"${text}"
-Return ONLY the raw translation.`;
+Text: ${text}`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.0-flash-exp",
+        model: "gemini-3.7-flash",
         contents: prompt,
-        config: {
-          safetySettings: [
-            { category: "HARM_CATEGORY_HARASSMENT" as any, threshold: "BLOCK_NONE" as any },
-            { category: "HARM_CATEGORY_HATE_SPEECH" as any, threshold: "BLOCK_NONE" as any },
-            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT" as any, threshold: "BLOCK_NONE" as any },
-            { category: "HARM_CATEGORY_DANGEROUS_CONTENT" as any, threshold: "BLOCK_NONE" as any },
-          ],
-        },
       });
 
       const translatedText = response.text?.trim() || "";
@@ -140,12 +123,7 @@ Return ONLY the raw translation.`;
     let liveSession: any = null;
     let isConnecting = false;
 
-    async function initLiveSession(
-      mode: "single" | "dual" = "single",
-      langA: string = "English",
-      langB: string = "Khmer",
-      voiceName: string = "Zephyr"
-    ) {
+    async function initLiveSession(targetLang: string, voiceName: string = "Zephyr") {
       if (liveSession) {
         try {
           await liveSession.close();
@@ -158,11 +136,10 @@ Return ONLY the raw translation.`;
       try {
         isConnecting = true;
         const ai = getAI();
-        const systemInstruction = buildSystemInstruction(mode, langA, langB);
+        const systemInstruction = buildSystemInstruction(targetLang);
 
-        // Required models/gemini-2.0-flash-exp with responseModalities AUDIO and BLOCK_NONE safety settings
         liveSession = await ai.live.connect({
-          model: "models/gemini-2.0-flash-exp",
+          model: "gemini-3.1-flash-live-preview",
           config: {
             responseModalities: [Modality.AUDIO],
             speechConfig: {
@@ -170,27 +147,7 @@ Return ONLY the raw translation.`;
                 prebuiltVoiceConfig: { voiceName: voiceName || "Zephyr" },
               },
             },
-            safetySettings: [
-              {
-                category: "HARM_CATEGORY_HARASSMENT" as any,
-                threshold: "BLOCK_NONE" as any,
-              },
-              {
-                category: "HARM_CATEGORY_HATE_SPEECH" as any,
-                threshold: "BLOCK_NONE" as any,
-              },
-              {
-                category: "HARM_CATEGORY_SEXUALLY_EXPLICIT" as any,
-                threshold: "BLOCK_NONE" as any,
-              },
-              {
-                category: "HARM_CATEGORY_DANGEROUS_CONTENT" as any,
-                threshold: "BLOCK_NONE" as any,
-              },
-            ],
-            systemInstruction: {
-              parts: [{ text: systemInstruction }],
-            },
+            systemInstruction,
           },
           callbacks: {
             onmessage: (message: LiveServerMessage) => {
@@ -231,7 +188,7 @@ Return ONLY the raw translation.`;
                 );
               }
 
-              // Turn complete (session remains open continuously for fluid turns)
+              // Turn complete
               if (message.serverContent?.turnComplete) {
                 clientWs.send(
                   JSON.stringify({
@@ -264,9 +221,7 @@ Return ONLY the raw translation.`;
           clientWs.send(
             JSON.stringify({
               type: "ready",
-              mode,
-              languageA: langA,
-              languageB: langB,
+              targetLanguage: targetLang,
             })
           );
         }
@@ -290,13 +245,8 @@ Return ONLY the raw translation.`;
       try {
         const payload = JSON.parse(data.toString());
 
-        if (payload.type === "start" || payload.type === "update_config") {
-          await initLiveSession(
-            payload.mode || "single",
-            payload.languageA || payload.sourceLanguage || "English",
-            payload.languageB || payload.targetLanguage || "Khmer",
-            payload.voice || "Zephyr"
-          );
+        if (payload.type === "start" || payload.type === "update_target") {
+          await initLiveSession(payload.targetLanguage || "Khmer", payload.voice || "Zephyr");
         } else if (payload.type === "audio") {
           if (liveSession && !isConnecting) {
             liveSession.sendRealtimeInput({
