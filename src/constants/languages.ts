@@ -1,34 +1,40 @@
 import { LanguageOption, VoiceOption } from "../types";
 
+export const PRIMARY_LANGUAGES: LanguageOption[] = [
+  { code: "es-419", name: "Latin American Spanish", nativeName: "Español (Latinoamérica)", flag: "🇲🇽" },
+  { code: "vi", name: "Vietnamese", nativeName: "Tiếng Việt", flag: "🇻🇳" },
+  { code: "th", name: "Thai", nativeName: "ภาษาไทย", flag: "🇹🇭" },
+  { code: "km", name: "Khmer", nativeName: "ភាសាខ្មែរ", flag: "🇰🇭" },
+  { code: "zh-CN", name: "Mainland Chinese", nativeName: "中文 (简体普通话)", flag: "🇨🇳" },
+];
+
 export const TARGET_LANGUAGES: LanguageOption[] = [
-  { code: "es", name: "Spanish", nativeName: "Español", flag: "🇪🇸" },
+  // 5 Main Priority Languages
+  { code: "es-419", name: "Latin American Spanish", nativeName: "Español (Latinoamérica)", flag: "🇲🇽" },
+  { code: "vi", name: "Vietnamese", nativeName: "Tiếng Việt", flag: "🇻🇳" },
+  { code: "th", name: "Thai", nativeName: "ภาษาไทย", flag: "🇹🇭" },
+  { code: "km", name: "Khmer", nativeName: "ភាសាខ្មែរ", flag: "🇰🇭" },
+  { code: "zh-CN", name: "Mainland Chinese", nativeName: "中文 (简体普通话)", flag: "🇨🇳" },
+
+  // Additional Global Languages
   { code: "fr", name: "French", nativeName: "Français", flag: "🇫🇷" },
   { code: "de", name: "German", nativeName: "Deutsch", flag: "🇩🇪" },
   { code: "ja", name: "Japanese", nativeName: "日本語", flag: "🇯🇵" },
-  { code: "zh", name: "Mandarin Chinese", nativeName: "中文 (普通话)", flag: "🇨🇳" },
-  { code: "it", name: "Italian", nativeName: "Italiano", flag: "🇮🇹" },
-  { code: "pt", name: "Portuguese", nativeName: "Português", flag: "🇵🇹" },
-  { code: "ru", name: "Russian", nativeName: "Русский", flag: "🇷🇺" },
   { code: "ko", name: "Korean", nativeName: "한국어", flag: "🇰🇷" },
+  { code: "pt-BR", name: "Brazilian Portuguese", nativeName: "Português (Brasil)", flag: "🇧🇷" },
+  { code: "it", name: "Italian", nativeName: "Italiano", flag: "🇮🇹" },
   { code: "hi", name: "Hindi", nativeName: "हिन्दी", flag: "🇮🇳" },
   { code: "ar", name: "Arabic", nativeName: "العربية", flag: "🇸🇦" },
+  { code: "id", name: "Indonesian", nativeName: "Bahasa Indonesia", flag: "🇮🇩" },
+  { code: "tl", name: "Tagalog / Filipino", nativeName: "Tagalog", flag: "🇵🇭" },
+  { code: "ru", name: "Russian", nativeName: "Русский", flag: "🇷🇺" },
+  { code: "tr", name: "Turkish", nativeName: "Türkçe", flag: "🇹🇷" },
   { code: "nl", name: "Dutch", nativeName: "Nederlands", flag: "🇳🇱" },
   { code: "pl", name: "Polish", nativeName: "Polski", flag: "🇵🇱" },
-  { code: "tr", name: "Turkish", nativeName: "Türkçe", flag: "🇹🇷" },
-  { code: "vi", name: "Vietnamese", nativeName: "Tiếng Việt", flag: "🇻🇳" },
-  { code: "id", name: "Indonesian", nativeName: "Bahasa Indonesia", flag: "🇮🇩" },
+  { code: "uk", name: "Ukrainian", nativeName: "Українська", flag: "🇺🇦" },
   { code: "sv", name: "Swedish", nativeName: "Svenska", flag: "🇸🇪" },
   { code: "el", name: "Greek", nativeName: "Ελληνικά", flag: "🇬🇷" },
-  { code: "th", name: "Thai", nativeName: "ไทย", flag: "🇹🇭" },
-  { code: "uk", name: "Ukrainian", nativeName: "Українська", flag: "🇺🇦" },
   { code: "he", name: "Hebrew", nativeName: "עברית", flag: "🇮🇱" },
-  { code: "tl", name: "Tagalog", nativeName: "Filipino", flag: "🇵🇭" },
-  { code: "cs", name: "Czech", nativeName: "Čeština", flag: "🇨🇿" },
-  { code: "ro", name: "Romanian", nativeName: "Română", flag: "🇷🇴" },
-  { code: "da", name: "Danish", nativeName: "Dansk", flag: "🇩🇰" },
-  { code: "fi", name: "Finnish", nativeName: "Suomi", flag: "🇫🇮" },
-  { code: "no", name: "Norwegian", nativeName: "Norsk", flag: "🇳🇴" },
-  { code: "hu", name: "Hungarian", nativeName: "Magyar", flag: "🇭🇺" },
   { code: "fa", name: "Persian", nativeName: "فارسی", flag: "🇮🇷" },
   { code: "bn", name: "Bengali", nativeName: "বাংলা", flag: "🇧🇩" },
 ];

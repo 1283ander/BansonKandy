@@ -3,11 +3,11 @@ import { useLiveAudio } from "./hooks/useLiveAudio";
 import { LanguageSelector } from "./components/LanguageSelector";
 import { AudioVisualizer } from "./components/AudioVisualizer";
 import { TranslationFeed } from "./components/TranslationFeed";
-import { TARGET_LANGUAGES, PREBUILT_VOICES } from "./constants/languages";
+import { TARGET_LANGUAGES, PRIMARY_LANGUAGES, PREBUILT_VOICES } from "./constants/languages";
 import { Volume2, AlertTriangle, Check, FileText } from "lucide-react";
 
 export default function App() {
-  const [targetLanguage, setTargetLanguage] = useState<string>("es");
+  const [targetLanguage, setTargetLanguage] = useState<string>("km");
   const [selectedVoice, setSelectedVoice] = useState<string>("Zephyr");
   const [showVoiceSettings, setShowVoiceSettings] = useState<boolean>(false);
   const [showLogs, setShowLogs] = useState<boolean>(false);
@@ -21,8 +21,6 @@ export default function App() {
     currentModelTurnText,
     startSession,
     stopSession,
-    updateTargetLanguage,
-    updateVoice,
     clearHistory,
   } = useLiveAudio({
     targetLanguage,
@@ -32,15 +30,27 @@ export default function App() {
   const activeLangObj =
     TARGET_LANGUAGES.find((l) => l.code === targetLanguage) || TARGET_LANGUAGES[0];
 
-  const handleLanguageChange = (newCode: string) => {
-    setTargetLanguage(newCode);
-    updateTargetLanguage(newCode);
+  const handleLanguageChange = (langCode: string) => {
+    setTargetLanguage(langCode);
+    if (
+      connectionState === "connected" ||
+      connectionState === "speaking" ||
+      connectionState === "translating"
+    ) {
+      stopSession();
+    }
   };
 
-  const handleVoiceChange = (voiceId: string) => {
-    setSelectedVoice(voiceId);
-    updateVoice(voiceId);
+  const handleVoiceChange = (voice: string) => {
+    setSelectedVoice(voice);
     setShowVoiceSettings(false);
+    if (
+      connectionState === "connected" ||
+      connectionState === "speaking" ||
+      connectionState === "translating"
+    ) {
+      stopSession();
+    }
   };
 
   const handleToggleSession = () => {
@@ -61,11 +71,11 @@ export default function App() {
     connectionState === "translating";
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] text-[#171717] flex flex-col justify-between font-sans select-none antialiased">
-      {/* Navigation Header */}
-      <nav className="flex justify-between items-center px-6 sm:px-12 pt-6 sm:pt-10 max-w-7xl w-full mx-auto">
-        <div className="flex items-center space-x-3">
-          <div className="w-6 h-6 bg-black rounded-sm flex items-center justify-center shadow-xs">
+    <div className="min-h-[100dvh] bg-[#FAFAFA] text-[#171717] flex flex-col justify-between font-sans select-none antialiased overflow-x-hidden">
+      {/* Mobile-First Header Bar */}
+      <header className="flex justify-between items-center px-4 sm:px-8 pt-4 sm:pt-6 pb-2 max-w-2xl w-full mx-auto shrink-0">
+        <div className="flex items-center space-x-2.5">
+          <div className="w-5 h-5 bg-neutral-900 rounded-sm flex items-center justify-center shadow-xs">
             <div className="w-1.5 h-1.5 bg-white rounded-full" />
           </div>
           <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-neutral-900">
@@ -73,9 +83,9 @@ export default function App() {
           </span>
         </div>
 
-        <div className="flex items-center space-x-4 sm:space-x-6">
+        <div className="flex items-center space-x-2 sm:space-x-4">
           {/* Engine Status Badge */}
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1.5 px-2 py-1 rounded-full bg-white border border-neutral-200/80 shadow-2xs">
             <span
               className={`w-1.5 h-1.5 rounded-full ${
                 isLive
@@ -85,84 +95,92 @@ export default function App() {
                   : "bg-neutral-300"
               }`}
             />
-            <span className="text-[10px] font-semibold uppercase tracking-tight text-neutral-400 hidden sm:inline">
-              {isLive ? "Gemini Live Active" : "Gemini Engine Standby"}
+            <span className="text-[9px] font-bold uppercase tracking-tight text-neutral-500">
+              {isLive ? "Live" : "Standby"}
             </span>
           </div>
 
-          <div className="h-4 w-[1px] bg-neutral-200" />
-
-          {/* Voice Selector Toggle */}
+          {/* Voice Picker Toggle (Touch Friendly) */}
           <div className="relative">
             <button
               id="voice-settings-button"
               type="button"
               onClick={() => setShowVoiceSettings(!showVoiceSettings)}
-              className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 hover:text-neutral-900 transition-colors flex items-center gap-1.5 cursor-pointer py-1"
+              className="min-h-[36px] px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider text-neutral-500 hover:text-neutral-900 bg-white border border-neutral-200/80 shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer touch-manipulation"
             >
-              <Volume2 className="w-3 h-3 opacity-60" />
-              <span>Voice: {selectedVoice}</span>
+              <Volume2 className="w-3.5 h-3.5 text-neutral-400" />
+              <span>{selectedVoice}</span>
             </button>
 
             {showVoiceSettings && (
-              <div
-                id="voice-settings-menu"
-                className="absolute right-0 mt-2 w-56 rounded-2xl bg-white border border-neutral-200 shadow-[0_20px_40px_rgba(0,0,0,0.08)] z-50 p-1.5 animate-in fade-in zoom-in-95 duration-150"
-              >
-                <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-neutral-400 border-b border-neutral-100 mb-1">
-                  Select Output Voice
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setShowVoiceSettings(false)}
+                />
+                <div
+                  id="voice-settings-menu"
+                  className="absolute right-0 mt-2 w-60 rounded-2xl bg-white border border-neutral-200 shadow-xl z-50 p-2 animate-in fade-in zoom-in-95 duration-150"
+                >
+                  <div className="px-3 py-1.5 text-[9px] font-bold uppercase tracking-widest text-neutral-400 border-b border-neutral-100 mb-1">
+                    Select Speech Voice
+                  </div>
+                  {PREBUILT_VOICES.map((v) => (
+                    <button
+                      key={v.id}
+                      id={`voice-option-${v.id}`}
+                      onClick={() => handleVoiceChange(v.id)}
+                      className={`w-full min-h-[40px] flex items-center justify-between px-3 py-2 rounded-xl text-left transition-colors cursor-pointer touch-manipulation ${
+                        selectedVoice === v.id
+                          ? "bg-neutral-900 text-white font-semibold"
+                          : "text-neutral-700 hover:bg-neutral-50"
+                      }`}
+                    >
+                      <div>
+                        <div className={`font-medium text-xs ${selectedVoice === v.id ? "text-white" : "text-neutral-900"}`}>
+                          {v.name}
+                        </div>
+                        <div className={`text-[10px] font-normal ${selectedVoice === v.id ? "text-neutral-300" : "text-neutral-400"}`}>
+                          {v.description}
+                        </div>
+                      </div>
+                      {selectedVoice === v.id && (
+                        <Check className="w-3.5 h-3.5 text-white shrink-0" />
+                      )}
+                    </button>
+                  ))}
                 </div>
-                {PREBUILT_VOICES.map((v) => (
-                  <button
-                    key={v.id}
-                    id={`voice-option-${v.id}`}
-                    onClick={() => handleVoiceChange(v.id)}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs text-left transition-colors cursor-pointer ${
-                      selectedVoice === v.id
-                        ? "bg-neutral-100 font-semibold text-neutral-900"
-                        : "text-neutral-600 hover:bg-neutral-50"
-                    }`}
-                  >
-                    <div>
-                      <div className="font-medium text-xs text-neutral-800">{v.name}</div>
-                      <div className="text-[10px] text-neutral-400 font-normal">{v.description}</div>
-                    </div>
-                    {selectedVoice === v.id && (
-                      <Check className="w-3.5 h-3.5 text-neutral-900 shrink-0" />
-                    )}
-                  </button>
-                ))}
-              </div>
+              </>
             )}
           </div>
 
-          <div className="h-4 w-[1px] bg-neutral-200" />
-
-          {/* Interface Logs Toggle Button */}
+          {/* Transcript Logs Toggle */}
           <button
             id="toggle-logs-button"
             type="button"
             onClick={() => setShowLogs(!showLogs)}
-            className={`text-[10px] font-bold uppercase tracking-wider transition-colors flex items-center gap-1 cursor-pointer py-1 ${
-              showLogs ? "text-neutral-900" : "text-neutral-400 hover:text-neutral-900"
+            className={`min-h-[36px] px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors flex items-center gap-1.5 cursor-pointer touch-manipulation border ${
+              showLogs
+                ? "bg-neutral-900 text-white border-neutral-900"
+                : "bg-white text-neutral-500 hover:text-neutral-900 border-neutral-200/80 shadow-2xs"
             }`}
           >
-            <FileText className="w-3 h-3 opacity-60" />
-            <span>{showLogs ? "Hide Stream" : "Stream Logs"}</span>
-            {translations.length > 0 && (
-              <span className="w-1.5 h-1.5 bg-neutral-800 rounded-full ml-0.5" />
+            <FileText className="w-3.5 h-3.5" />
+            <span className="hidden xs:inline">{showLogs ? "Hide" : "Logs"}</span>
+            {translations.length > 0 && !showLogs && (
+              <span className="w-1.5 h-1.5 bg-neutral-900 rounded-full" />
             )}
           </button>
         </div>
-      </nav>
+      </header>
 
-      {/* Main Focus Area */}
-      <main className="flex-1 flex flex-col items-center justify-center px-4 py-8 max-w-4xl w-full mx-auto">
-        {/* Direction Rule Badge */}
-        <div className="mb-4 px-3.5 py-1 rounded-full border border-neutral-200/80 bg-white/80 text-[10px] font-medium tracking-wide uppercase text-neutral-400 flex items-center gap-2 shadow-2xs">
-          <span className="text-neutral-700">English ➔ {activeLangObj.name}</span>
-          <span className="text-neutral-200">|</span>
-          <span className="text-neutral-700">Foreign ➔ English</span>
+      {/* Main Translation Canvas */}
+      <main className="flex-1 flex flex-col items-center justify-center px-4 py-2 w-full max-w-lg mx-auto">
+        {/* Language Routing Pill */}
+        <div className="mb-2 px-3 py-1 rounded-full border border-neutral-200 bg-white text-[10px] font-medium tracking-tight text-neutral-500 flex items-center gap-1.5 shadow-2xs">
+          <span className="text-neutral-900 font-semibold">English</span>
+          <span className="text-neutral-300">⇄</span>
+          <span className="text-neutral-900 font-semibold">{activeLangObj.name}</span>
         </div>
 
         {/* Central Geometric Concentric Visualizer Button */}
@@ -174,18 +192,18 @@ export default function App() {
           targetLanguageName={activeLangObj.name}
         />
 
-        {/* Error Notice */}
+        {/* Error Notification */}
         {errorMessage && (
           <div
             id="error-banner"
-            className="w-full max-w-sm mt-4 p-3 rounded-2xl bg-rose-50/80 border border-rose-200/80 text-rose-800 text-xs flex items-center gap-2.5 animate-in fade-in"
+            className="w-full max-w-sm mt-3 p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2.5 animate-in fade-in"
           >
             <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
             <p className="flex-1 font-light leading-snug">{errorMessage}</p>
           </div>
         )}
 
-        {/* Live Translation Stream Drawer/Feed */}
+        {/* Live Translation Feed Stream */}
         {(showLogs || translations.length > 0 || currentModelTurnText.length > 0) && (
           <TranslationFeed
             translations={translations}
@@ -196,36 +214,59 @@ export default function App() {
         )}
       </main>
 
-      {/* Footer Section */}
-      <footer className="flex flex-col items-center pb-8 sm:pb-12 space-y-6 sm:space-y-8 max-w-3xl w-full mx-auto px-4">
-        {/* Target Language Dropdown */}
-        <div className="flex flex-col items-center space-y-3">
-          <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-[0.4em]">
-            Target Output Language
-          </span>
+      {/* Mobile-First Language Selection Section */}
+      <footer className="w-full max-w-lg mx-auto px-4 pb-4 sm:pb-8 pt-2 flex flex-col items-center space-y-3 shrink-0">
+        {/* 5 Primary Main Options Quick Switcher Bar (Mobile First 1-Tap Access) */}
+        <div className="w-full">
+          <div className="flex items-center justify-between px-1 mb-1.5">
+            <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-[0.2em]">
+              Main Languages
+            </span>
+            <span className="text-[9px] text-neutral-400 font-medium">
+              1-Tap Quick Switch
+            </span>
+          </div>
 
+          <div className="grid grid-cols-5 gap-1.5 w-full">
+            {PRIMARY_LANGUAGES.map((lang) => {
+              const isSelected = lang.code === targetLanguage;
+              return (
+                <button
+                  key={`quick-${lang.code}`}
+                  id={`quick-lang-${lang.code}`}
+                  type="button"
+                  onClick={() => handleLanguageChange(lang.code)}
+                  className={`min-h-[46px] py-2 px-1 rounded-xl flex flex-col items-center justify-center transition-all cursor-pointer touch-manipulation ${
+                    isSelected
+                      ? "bg-neutral-900 text-white shadow-xs scale-[1.02] ring-1 ring-neutral-900"
+                      : "bg-white text-neutral-700 hover:bg-neutral-100/80 border border-neutral-200/80 active:scale-95"
+                  }`}
+                  title={`${lang.name} (${lang.nativeName})`}
+                >
+                  <span className="text-base leading-none mb-0.5">{lang.flag}</span>
+                  <span
+                    className={`text-[9px] font-semibold tracking-tight text-center truncate max-w-full px-0.5 leading-tight ${
+                      isSelected ? "text-white" : "text-neutral-800"
+                    }`}
+                  >
+                    {lang.code === "es-419"
+                      ? "Spanish"
+                      : lang.code === "zh-CN"
+                      ? "Chinese"
+                      : lang.name}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Full Language Selector / Modal Sheet Trigger */}
+        <div className="w-full">
           <LanguageSelector
             selectedLanguage={targetLanguage}
             onSelectLanguage={handleLanguageChange}
           />
-        </div>
-
-        {/* Telemetry Indicator Strip */}
-        <div className="flex flex-wrap items-center justify-center gap-y-2 gap-x-6 sm:gap-x-10 text-[9px] font-bold uppercase tracking-[0.2em] text-neutral-300">
-          <div className="flex items-center space-x-2">
-            <span className="text-neutral-300">Input</span>
-            <span className="text-neutral-500">Auto-Sense Enabled</span>
-          </div>
-          <div className="w-1 h-1 bg-neutral-300 rounded-full hidden sm:block" />
-          <div className="flex items-center space-x-2">
-            <span className="text-neutral-300">Latency</span>
-            <span className="text-neutral-500">Low-Latency Live</span>
-          </div>
-          <div className="w-1 h-1 bg-neutral-300 rounded-full hidden sm:block" />
-          <div className="flex items-center space-x-2">
-            <span className="text-neutral-300">Prosody</span>
-            <span className="text-neutral-500">Mirror Mode On</span>
-          </div>
         </div>
       </footer>
     </div>
