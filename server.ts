@@ -15,7 +15,7 @@ function getAI(): GoogleGenAI {
   if (!aiClient) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      throw new Error("GEMINI_API_KEY environment variable is not configured.");
+      throw new Error("GEMINI_API_KEY is not configured in Settings > Secrets.");
     }
     aiClient = new GoogleGenAI({
       apiKey,
@@ -31,41 +31,94 @@ function getAI(): GoogleGenAI {
 
 function buildSystemInstruction(targetLanguage: string): string {
   return `You are an ultra-low-latency, real-time speech-to-speech conversational translator.
-Your sole purpose is to translate speech back and forth instantaneously with flawless conversational fluidity, natural rhythm, authentic accents, and realistic prosody.
+Your sole purpose is to translate speech back and forth instantaneously with natural rhythm, authentic accents, and realistic prosody.
 
-Configured target language for English speech: ${targetLanguage || "Spanish"}
+Configured target language for English speech: ${targetLanguage || "Khmer"}
 
 STRICT OPERATIONAL RULES:
 1. BIDIRECTIONAL LANGUAGE ROUTING:
-   - If the user speaks in English: Instantly translate their words into ${targetLanguage || "Spanish"}.
-   - If the user speaks in ANY language other than English (for example Spanish, French, Japanese, German, Mandarin, Italian, Portuguese, Arabic, Russian, Korean, Hindi, etc.): Instantly translate their words into English.
-2. FIDELITY & REGISTER MATCHING:
-   - Mirror the exact emotional tone, volume, cadence, hesitation, laughter, informality, slang, idioms, profanity, vulgarity, or explicitness of the original speaker.
-   - Do NOT censor, soften, sanitize, embellish, or moralize the input. Maintain the exact nuance, intensity, and natural sounding prosody of the original speaker.
-3. STRICT PROHIBITION (TRANSLATION ONLY):
-   - You MUST NEVER engage in conversational dialogue with the user.
-   - You MUST NEVER answer questions asked by the user, provide advice, or offer commentary.
-   - You MUST NEVER prefix or suffix your response with meta-phrases like "The translation is:", "In English that means:", "Here you go:", etc.
-   - You MUST NEVER introduce yourself, greet the user, or add novel thoughts.
-   - You must ALWAYS and ONLY output the translated speech in voice.`;
+   - If the user speaks in English: Instantly translate their words into ${targetLanguage || "Khmer"}.
+   - If the user speaks in ANY foreign language other than English (including Khmer, Vietnamese, Thai, Latin American Spanish, Mandarin Chinese, French, German, Japanese, Korean, Russian, etc.): Instantly translate their words into English.
+2. FIDELITY & ACCURACY:
+   - Mirror the exact emotional tone, volume, cadence, hesitation, laughter, and nuance of the original speaker.
+   - Do NOT censor, soften, sanitize, or embellish. Maintain natural sounding colloquial phrasing and prosody.
+3. TRANSLATION ONLY:
+   - You MUST NEVER engage in dialogue with the user.
+   - You MUST NEVER answer questions asked by the user or offer commentary.
+   - You MUST NEVER prefix responses with phrases like "The translation is:", "In English:", etc.
+   - Output ONLY the translated speech in voice.`;
 }
 
 async function startServer() {
   const app = express();
   const server = http.createServer(app);
 
-  app.use(express.json());
+  app.use(express.json({ limit: "20mb" }));
 
   // Health check
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
+  // REST Translation Fallback Endpoint
+  app.post("/api/translate", async (req, res) => {
+    try {
+      const { text, targetLanguage = "Khmer" } = req.body;
+      if (!text) {
+        return res.status(400).json({ error: "Missing text to translate" });
+      }
+
+      const ai = getAI();
+      const prompt = `You are an expert bidirectional translator. 
+If the following text is in English, translate it to ${targetLanguage}.
+If the text is in any language other than English, translate it to English.
+Return ONLY the translation without any quotes or explanations.
+
+Text: ${text}`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.7-flash",
+        contents: prompt,
+      });
+
+      const translatedText = response.text?.trim() || "";
+      res.json({ translatedText });
+    } catch (err: any) {
+      console.error("HTTP translate error:", err);
+      res.status(500).json({ error: err?.message || "Translation failed" });
+    }
+  });
+
   // WebSocket Server for Gemini Live Realtime Audio Streaming
-  const wss = new WebSocketServer({ server, path: "/api/live" });
+  const wss = new WebSocketServer({ noServer: true });
+
+  wss.on("error", (err) => {
+    console.error("WebSocketServer error:", err);
+  });
+
+  server.on("upgrade", (request, socket, head) => {
+    try {
+      const host = request.headers.host || "localhost";
+      const parsedUrl = new URL(request.url || "", `http://${host}`);
+      const pathname = parsedUrl.pathname;
+
+      if (pathname === "/api/live" || pathname === "/api/live/") {
+        wss.handleUpgrade(request, socket, head, (ws) => {
+          wss.emit("connection", ws, request);
+        });
+      }
+    } catch (err) {
+      console.error("Upgrade handler error:", err);
+      socket.destroy();
+    }
+  });
 
   wss.on("connection", (clientWs: WebSocket) => {
-    console.log("Client connected to /api/live");
+    console.log("Client connected to /api/live WebSocket");
+
+    clientWs.on("error", (err) => {
+      console.error("Client WebSocket error:", err);
+    });
 
     let liveSession: any = null;
     let isConnecting = false;
@@ -95,8 +148,6 @@ async function startServer() {
               },
             },
             systemInstruction,
-            outputAudioTranscription: {},
-            inputAudioTranscription: {},
           },
           callbacks: {
             onmessage: (message: LiveServerMessage) => {
@@ -157,7 +208,7 @@ async function startServer() {
                 clientWs.send(
                   JSON.stringify({
                     type: "error",
-                    message: err?.message || "Live API error occurred.",
+                    message: err?.message || "Live API session encountered an error.",
                   })
                 );
               }
@@ -181,7 +232,9 @@ async function startServer() {
           clientWs.send(
             JSON.stringify({
               type: "error",
-              message: err?.message || "Failed to initialize Gemini Live session.",
+              message:
+                err?.message ||
+                "Failed to initialize Gemini Live. Check your API key in Settings.",
             })
           );
         }
@@ -192,10 +245,8 @@ async function startServer() {
       try {
         const payload = JSON.parse(data.toString());
 
-        if (payload.type === "start") {
-          await initLiveSession(payload.targetLanguage || "Spanish", payload.voice || "Zephyr");
-        } else if (payload.type === "update_target") {
-          await initLiveSession(payload.targetLanguage || "Spanish", payload.voice || "Zephyr");
+        if (payload.type === "start" || payload.type === "update_target") {
+          await initLiveSession(payload.targetLanguage || "Khmer", payload.voice || "Zephyr");
         } else if (payload.type === "audio") {
           if (liveSession && !isConnecting) {
             liveSession.sendRealtimeInput({

@@ -41,7 +41,11 @@ export function useLiveAudio({ targetLanguage, voice }: UseLiveAudioOptions) {
       animFrameIdRef.current = null;
     }
     if (processorRef.current) {
-      processorRef.current.disconnect();
+      try {
+        processorRef.current.disconnect();
+      } catch {
+        // ignore
+      }
       processorRef.current = null;
     }
     if (inputAudioCtxRef.current && inputAudioCtxRef.current.state !== "closed") {
@@ -49,7 +53,13 @@ export function useLiveAudio({ targetLanguage, voice }: UseLiveAudioOptions) {
       inputAudioCtxRef.current = null;
     }
     if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current.getTracks().forEach((track) => {
+        try {
+          track.stop();
+        } catch {
+          // ignore
+        }
+      });
       mediaStreamRef.current = null;
     }
     if (playerRef.current) {
@@ -57,11 +67,15 @@ export function useLiveAudio({ targetLanguage, voice }: UseLiveAudioOptions) {
       playerRef.current = null;
     }
     if (wsRef.current) {
-      if (
-        wsRef.current.readyState === WebSocket.OPEN ||
-        wsRef.current.readyState === WebSocket.CONNECTING
-      ) {
-        wsRef.current.close();
+      try {
+        if (
+          wsRef.current.readyState === WebSocket.OPEN ||
+          wsRef.current.readyState === WebSocket.CONNECTING
+        ) {
+          wsRef.current.close();
+        }
+      } catch {
+        // ignore
       }
       wsRef.current = null;
     }
@@ -106,6 +120,9 @@ export function useLiveAudio({ targetLanguage, voice }: UseLiveAudioOptions) {
         window.AudioContext ||
         (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       const inputCtx = new AudioContextClass();
+      if (inputCtx.state === "suspended") {
+        await inputCtx.resume();
+      }
       inputAudioCtxRef.current = inputCtx;
 
       const source = inputCtx.createMediaStreamSource(stream);
@@ -113,7 +130,7 @@ export function useLiveAudio({ targetLanguage, voice }: UseLiveAudioOptions) {
       analyser.fftSize = 256;
       inputAnalyserRef.current = analyser;
 
-      // Buffer size 2048 or 4096 gives smooth continuous low-latency chunks
+      // Buffer size 2048 gives low-latency continuous stream
       const processor = inputCtx.createScriptProcessor(2048, 1, 1);
       processorRef.current = processor;
 
@@ -128,7 +145,7 @@ export function useLiveAudio({ targetLanguage, voice }: UseLiveAudioOptions) {
         setModelVolume(vol);
       });
 
-      // 4. Connect WebSocket
+      // 4. Connect WebSocket to the backend
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const wsUrl = `${protocol}//${window.location.host}/api/live`;
       const ws = new WebSocket(wsUrl);
@@ -177,24 +194,23 @@ export function useLiveAudio({ targetLanguage, voice }: UseLiveAudioOptions) {
             });
             setConnectionState("connected");
           } else if (msg.type === "error") {
-            setErrorMessage(msg.message || "An error occurred with Gemini Live.");
+            setErrorMessage(msg.message || "Live API session encountered an error.");
             setConnectionState("error");
           } else if (msg.type === "session_closed" || msg.type === "stopped") {
             setConnectionState("disconnected");
           }
         } catch (err) {
-          console.error("Error parsing WS message", err);
+          console.error("Error parsing WS message:", err);
         }
       };
 
-      ws.onerror = (e) => {
-        console.error("WebSocket error:", e);
-        setErrorMessage("Connection to live translation server failed.");
+      ws.onerror = () => {
+        setErrorMessage("Live translation WebSocket connection could not be established.");
         setConnectionState("error");
       };
 
       ws.onclose = () => {
-        setConnectionState("disconnected");
+        setConnectionState((prev) => (prev === "connecting" || prev === "connected" || prev === "translating" ? "disconnected" : prev));
         cleanupAudio();
       };
 
@@ -217,7 +233,7 @@ export function useLiveAudio({ targetLanguage, voice }: UseLiveAudioOptions) {
     } catch (err: any) {
       console.error("Failed to start voice session:", err);
       setErrorMessage(
-        err?.name === "NotAllowedError"
+        err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError"
           ? "Microphone access was denied. Please allow microphone permissions."
           : err?.message || "Could not start audio session."
       );
@@ -228,7 +244,11 @@ export function useLiveAudio({ targetLanguage, voice }: UseLiveAudioOptions) {
 
   const stopSession = useCallback(() => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: "stop" }));
+      try {
+        wsRef.current.send(JSON.stringify({ type: "stop" }));
+      } catch {
+        // ignore
+      }
     }
     cleanupAudio();
     setConnectionState("disconnected");
