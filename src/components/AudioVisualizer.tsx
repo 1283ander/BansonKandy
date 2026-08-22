@@ -1,13 +1,15 @@
 import React from "react";
 import { Mic, Volume2, Loader2, AlertCircle } from "lucide-react";
-import { ConnectionState } from "../types";
+import { AppMode, ConnectionState } from "../types";
 
 interface AudioVisualizerProps {
   connectionState: ConnectionState;
   userVolume: number;
   modelVolume: number;
   onToggleSession: () => void;
-  targetLanguageName: string;
+  mode: AppMode;
+  langAName: string;
+  langBName: string;
 }
 
 export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
@@ -15,7 +17,9 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
   userVolume,
   modelVolume,
   onToggleSession,
-  targetLanguageName,
+  mode,
+  langAName,
+  langBName,
 }) => {
   const isConnected =
     connectionState === "connected" ||
@@ -33,12 +37,12 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
   const ring3Scale = 1 + activeVol * 0.35;
 
   return (
-    <div className="relative flex flex-col items-center justify-center my-3 sm:my-8 w-full max-w-sm mx-auto">
+    <div className="relative flex flex-col items-center justify-center my-2 sm:my-6 w-full max-w-sm mx-auto">
       {/* Concentric Geometric Neutral Rings */}
-      <div className="relative flex items-center justify-center w-[270px] h-[270px] xs:w-[300px] xs:h-[300px] sm:w-[380px] sm:h-[380px]">
+      <div className="relative flex items-center justify-center w-[250px] h-[250px] xs:w-[280px] xs:h-[280px] sm:w-[340px] sm:h-[340px]">
         {/* Ring 3 (Outer) */}
         <div
-          className="absolute w-[250px] h-[250px] xs:w-[280px] xs:h-[280px] sm:w-[360px] sm:h-[360px] border border-neutral-200/50 rounded-full transition-transform duration-100 ease-out pointer-events-none"
+          className="absolute w-[230px] h-[230px] xs:w-[260px] xs:h-[260px] sm:w-[320px] sm:h-[320px] border border-neutral-200/50 rounded-full transition-transform duration-100 ease-out pointer-events-none"
           style={{
             transform: `scale(${ring3Scale})`,
             borderColor: isModelSpeaking
@@ -51,7 +55,7 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
 
         {/* Ring 2 (Middle) */}
         <div
-          className="absolute w-[200px] h-[200px] xs:w-[225px] xs:h-[225px] sm:w-[290px] sm:h-[290px] border border-neutral-200/70 rounded-full transition-transform duration-100 ease-out pointer-events-none"
+          className="absolute w-[185px] h-[185px] xs:w-[210px] xs:h-[210px] sm:w-[260px] sm:h-[260px] border border-neutral-200/70 rounded-full transition-transform duration-100 ease-out pointer-events-none"
           style={{
             transform: `scale(${ring2Scale})`,
             borderColor: isModelSpeaking
@@ -64,7 +68,7 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
 
         {/* Ring 1 (Inner) */}
         <div
-          className="absolute w-[155px] h-[155px] xs:w-[175px] xs:h-[175px] sm:w-[220px] sm:h-[220px] border border-neutral-200 rounded-full transition-transform duration-100 ease-out pointer-events-none"
+          className="absolute w-[145px] h-[145px] xs:w-[165px] xs:h-[165px] sm:w-[200px] sm:h-[200px] border border-neutral-200 rounded-full transition-transform duration-100 ease-out pointer-events-none"
           style={{
             transform: `scale(${ring1Scale})`,
             borderColor: isModelSpeaking
@@ -77,7 +81,7 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
 
         {/* Dynamic Connecting Rotation Ring */}
         {isConnecting && (
-          <div className="absolute w-[165px] h-[165px] xs:w-[185px] xs:h-[185px] sm:w-[230px] sm:h-[230px] rounded-full border border-dashed border-neutral-400 animate-spin pointer-events-none" />
+          <div className="absolute w-[155px] h-[155px] xs:w-[175px] xs:h-[175px] sm:w-[210px] sm:h-[210px] rounded-full border border-dashed border-neutral-400 animate-spin pointer-events-none" />
         )}
 
         {/* Central Minimal Main Action Button (Optimal Mobile Touch Size) */}
@@ -89,7 +93,7 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
           style={{
             transform: `scale(${buttonScale})`,
           }}
-          className={`group relative z-10 w-32 h-32 xs:w-36 xs:h-36 sm:w-40 sm:h-40 rounded-full flex flex-col items-center justify-center transition-all duration-200 shadow-[0_16px_40px_rgba(0,0,0,0.12)] active:scale-95 cursor-pointer select-none focus:outline-none touch-manipulation ${
+          className={`group relative z-10 w-28 h-28 xs:w-32 xs:h-32 sm:w-36 sm:h-36 rounded-full flex flex-col items-center justify-center transition-all duration-200 shadow-[0_16px_40px_rgba(0,0,0,0.12)] active:scale-95 cursor-pointer select-none focus:outline-none touch-manipulation ${
             isConnected
               ? isModelSpeaking
                 ? "bg-[#171717] text-amber-300 ring-2 ring-amber-500/40 shadow-[0_20px_50px_rgba(217,119,6,0.15)]"
@@ -107,20 +111,20 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
           }
         >
           {isConnecting ? (
-            <Loader2 className="w-9 h-9 sm:w-10 sm:h-10 animate-spin text-neutral-300 stroke-[1.25]" />
+            <Loader2 className="w-8 h-8 sm:w-9 sm:h-9 animate-spin text-neutral-300 stroke-[1.25]" />
           ) : isConnected ? (
             isModelSpeaking ? (
-              <Volume2 className="w-9 h-9 sm:w-10 sm:h-10 animate-pulse stroke-[1.25]" />
+              <Volume2 className="w-8 h-8 sm:w-9 sm:h-9 animate-pulse stroke-[1.25]" />
             ) : (
-              <Mic className="w-9 h-9 sm:w-10 sm:h-10 stroke-[1.25]" />
+              <Mic className="w-8 h-8 sm:w-9 sm:h-9 stroke-[1.25]" />
             )
           ) : connectionState === "error" ? (
-            <AlertCircle className="w-9 h-9 sm:w-10 sm:h-10 stroke-[1.25]" />
+            <AlertCircle className="w-8 h-8 sm:w-9 sm:h-9 stroke-[1.25]" />
           ) : (
-            <Mic className="w-9 h-9 sm:w-10 sm:h-10 stroke-[1.25] text-white" />
+            <Mic className="w-8 h-8 sm:w-9 sm:h-9 stroke-[1.25] text-white" />
           )}
 
-          <span className="mt-2 text-[10px] sm:text-[11px] font-bold tracking-[0.2em] uppercase opacity-75">
+          <span className="mt-1.5 text-[9px] sm:text-[10px] font-bold tracking-[0.2em] uppercase opacity-80">
             {isConnecting
               ? "Connecting"
               : isConnected
@@ -135,25 +139,33 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
       </div>
 
       {/* Typography and Status Section */}
-      <div className="mt-4 sm:mt-6 text-center px-4">
-        <h2 className="text-xl sm:text-2xl font-normal tracking-tight text-neutral-900 leading-snug">
+      <div className="mt-3 sm:mt-5 text-center px-4">
+        <h2 className="text-lg sm:text-xl font-medium tracking-tight text-neutral-900 leading-snug">
           {isConnected
             ? isModelSpeaking
-              ? `Translating to ${targetLanguageName}`
-              : "Live & Listening"
-            : "Live Voice Translator"}
+              ? mode === "dual"
+                ? "Translating Turn..."
+                : `Translating to ${langBName}`
+              : mode === "dual"
+              ? `Listening: ${langAName} ⇄ ${langBName}`
+              : `Listening to ${langAName}`
+            : mode === "dual"
+            ? "Dual-User Bilingual Mediator"
+            : "Single-User Linguistic Mirror"}
         </h2>
-        <p className="text-neutral-400 text-xs mt-1 sm:mt-1.5 leading-relaxed font-light">
+        <p className="text-neutral-400 text-xs mt-1 leading-relaxed font-light">
           {isConnected
-            ? isModelSpeaking
-              ? "Voice synthesized naturally with matched prosody"
-              : "Speak in English or your target language"
-            : "Natural bidirectional conversational translation"}
+            ? mode === "dual"
+              ? `Both speakers can talk freely. Turns translate automatically between ${langAName} and ${langBName}.`
+              : `Exact linguistic register, dialect, and nuance preserved into ${langBName}.`
+            : mode === "dual"
+            ? "Two speakers converse seamlessly with real-time bidirectional translation."
+            : "Speak directly in your native language with strict register preservation."}
         </p>
       </div>
 
       {/* Minimal Status Pill */}
-      <div className="mt-3 flex items-center justify-center">
+      <div className="mt-2.5 flex items-center justify-center">
         <div
           id="status-indicator-pill"
           className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-semibold tracking-wide uppercase bg-white border border-neutral-200 text-neutral-600 shadow-2xs"
@@ -174,15 +186,15 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
           <span className="text-neutral-500">
             {isConnected
               ? isModelSpeaking
-                ? "Translating Voice"
+                ? "Voice Synthesizing"
                 : isUserSpeaking
-                ? "Listening..."
-                : "Listening continuously"
+                ? "Hearing Voice..."
+                : "Continuous Live Session"
               : isConnecting
               ? "Connecting Live Session"
               : connectionState === "error"
               ? "Connection Error"
-              : "Ready to Stream"}
+              : "Ready to Start"}
           </span>
         </div>
       </div>

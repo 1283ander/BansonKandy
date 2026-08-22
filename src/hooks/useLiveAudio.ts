@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { ConnectionState, TranslationTurn } from "../types";
+import { AppMode, ConnectionState, TranslationTurn } from "../types";
 import {
   float32To16BitPCM,
   arrayBufferToBase64,
@@ -8,11 +8,13 @@ import {
 } from "../utils/audio";
 
 interface UseLiveAudioOptions {
-  targetLanguage: string;
+  mode: AppMode;
+  languageA: string; // E.g. "English" or "Language 1"
+  languageB: string; // E.g. "Khmer" or "Language 2"
   voice: string;
 }
 
-export function useLiveAudio({ targetLanguage, voice }: UseLiveAudioOptions) {
+export function useLiveAudio({ mode, languageA, languageB, voice }: UseLiveAudioOptions) {
   const [connectionState, setConnectionState] = useState<ConnectionState>("disconnected");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [userVolume, setUserVolume] = useState<number>(0);
@@ -28,8 +30,14 @@ export function useLiveAudio({ targetLanguage, voice }: UseLiveAudioOptions) {
   const playerRef = useRef<LiveAudioPlayer | null>(null);
   const animFrameIdRef = useRef<number | null>(null);
 
-  const targetLanguageRef = useRef(targetLanguage);
-  targetLanguageRef.current = targetLanguage;
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+
+  const languageARef = useRef(languageA);
+  languageARef.current = languageA;
+
+  const languageBRef = useRef(languageB);
+  languageBRef.current = languageB;
 
   const voiceRef = useRef(voice);
   voiceRef.current = voice;
@@ -152,11 +160,13 @@ export function useLiveAudio({ targetLanguage, voice }: UseLiveAudioOptions) {
       wsRef.current = ws;
 
       ws.onopen = () => {
-        // Send start configuration
+        // Send start configuration with selected session mode and languages
         ws.send(
           JSON.stringify({
             type: "start",
-            targetLanguage: targetLanguageRef.current,
+            mode: modeRef.current,
+            languageA: languageARef.current,
+            languageB: languageBRef.current,
             voice: voiceRef.current,
           })
         );
@@ -178,6 +188,7 @@ export function useLiveAudio({ targetLanguage, voice }: UseLiveAudioOptions) {
             setModelVolume(0);
             setConnectionState("connected");
           } else if (msg.type === "turn_complete") {
+            // Live WebSocket stays open continuously for turn-taking!
             setCurrentModelTurnText((prev) => {
               if (prev.trim()) {
                 setTranslations((hist) => [
@@ -194,7 +205,7 @@ export function useLiveAudio({ targetLanguage, voice }: UseLiveAudioOptions) {
             });
             setConnectionState("connected");
           } else if (msg.type === "error") {
-            setErrorMessage(msg.message || "Live API session encountered an error.");
+            setErrorMessage(msg.message || "Live translation session encountered an error.");
             setConnectionState("error");
           } else if (msg.type === "session_closed" || msg.type === "stopped") {
             setConnectionState("disconnected");
@@ -210,11 +221,15 @@ export function useLiveAudio({ targetLanguage, voice }: UseLiveAudioOptions) {
       };
 
       ws.onclose = () => {
-        setConnectionState((prev) => (prev === "connecting" || prev === "connected" || prev === "translating" ? "disconnected" : prev));
+        setConnectionState((prev) =>
+          prev === "connecting" || prev === "connected" || prev === "translating"
+            ? "disconnected"
+            : prev
+        );
         cleanupAudio();
       };
 
-      // 5. Stream PCM chunks from microphone to WebSocket
+      // 5. Stream PCM chunks continuously from microphone to WebSocket
       processor.onaudioprocess = (e) => {
         if (ws.readyState === WebSocket.OPEN) {
           const inputData = e.inputBuffer.getChannelData(0);
@@ -255,31 +270,27 @@ export function useLiveAudio({ targetLanguage, voice }: UseLiveAudioOptions) {
     setCurrentModelTurnText("");
   }, [cleanupAudio]);
 
-  const updateTargetLanguage = useCallback((newTarget: string) => {
-    targetLanguageRef.current = newTarget;
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(
-        JSON.stringify({
-          type: "update_target",
-          targetLanguage: newTarget,
-          voice: voiceRef.current,
-        })
-      );
-    }
-  }, []);
+  const updateSessionConfig = useCallback(
+    (newMode: AppMode, newLangA: string, newLangB: string, newVoice?: string) => {
+      modeRef.current = newMode;
+      languageARef.current = newLangA;
+      languageBRef.current = newLangB;
+      if (newVoice) voiceRef.current = newVoice;
 
-  const updateVoice = useCallback((newVoice: string) => {
-    voiceRef.current = newVoice;
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(
-        JSON.stringify({
-          type: "update_target",
-          targetLanguage: targetLanguageRef.current,
-          voice: newVoice,
-        })
-      );
-    }
-  }, []);
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(
+          JSON.stringify({
+            type: "update_config",
+            mode: newMode,
+            languageA: newLangA,
+            languageB: newLangB,
+            voice: voiceRef.current,
+          })
+        );
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     return () => {
@@ -296,8 +307,7 @@ export function useLiveAudio({ targetLanguage, voice }: UseLiveAudioOptions) {
     currentModelTurnText,
     startSession,
     stopSession,
-    updateTargetLanguage,
-    updateVoice,
+    updateSessionConfig,
     clearHistory: () => setTranslations([]),
   };
 }

@@ -1,3 +1,5 @@
+export type AppMode = "single" | "dual";
+
 export type ConnectionState =
   | "disconnected"
   | "connecting"
